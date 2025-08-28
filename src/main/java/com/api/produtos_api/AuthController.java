@@ -1,8 +1,16 @@
 package com.api.produtos_api;
 
+import com.api.produtos_api.AuthRequest;
+import com.api.produtos_api.AuthResponse;
+import com.api.produtos_api.JwtUtil;
+import com.api.produtos_api.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.*;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -10,44 +18,30 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     @Autowired
-    private AuthenticationManager authManager;
-
-    @Autowired
-    private CustomUserDetailsService userDetailsService;
+    private AuthenticationManager authenticationManager;
 
     @Autowired
     private JwtUtil jwtUtil;
 
-    @PostMapping("/login")
-    public String login(@RequestBody AuthRequest request) throws Exception {
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+
+    @PostMapping(value = "/login", produces = "application/json; charset=UTF-8")
+    public ResponseEntity<?> login(@RequestBody AuthRequest request) {
         try {
-            authManager.authenticate(new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-        } catch (BadCredentialsException e) {
-            throw new Exception("Usuário ou senha inválidos");
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getUsername(),
+                            request.getPassword()
+                    )
+            );
+
+            final String token = jwtUtil.generateToken(authentication.getName());
+            return ResponseEntity.ok(new AuthResponse(token));
+
+        } catch (AuthenticationException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("{\"error\": \"Usuário ou senha inválidos\"}");
         }
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-        return jwtUtil.generateToken(userDetails.getUsername());
-    }
-}
-
-class AuthRequest {
-    private String username;
-    private String password;
-    // getters e setters
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
     }
 }
